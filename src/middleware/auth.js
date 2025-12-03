@@ -5,10 +5,34 @@ const prisma = new PrismaClient();
 
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
+    // Try to get token from cookie first, then from Authorization header
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+
+    // Debug logging in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Auth check:', {
+        hasCookie: !!req.cookies?.token,
+        hasAuthHeader: !!req.headers.authorization,
+        cookies: Object.keys(req.cookies || {}),
+        origin: req.headers.origin,
+      });
+    }
 
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      // More detailed error message for debugging
+      const errorMsg = !req.cookies?.token && !req.headers.authorization
+        ? 'Authentication required: No token found in cookie or Authorization header'
+        : 'Authentication required';
+      
+      return res.status(401).json({ 
+        success: false, 
+        message: errorMsg,
+        debug: process.env.NODE_ENV !== 'production' ? {
+          hasCookies: !!req.cookies,
+          cookieKeys: Object.keys(req.cookies || {}),
+          hasAuthHeader: !!req.headers.authorization,
+        } : undefined,
+      });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -24,7 +48,15 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
+    // More specific error messages
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired' });
+    }
+    console.error('Auth error:', error);
+    return res.status(401).json({ success: false, message: 'Authentication failed' });
   }
 };
 
