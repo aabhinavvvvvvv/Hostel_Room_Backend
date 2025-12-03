@@ -27,14 +27,14 @@ const setTokenCookie = (res, token) => {
   res.cookie('token', token, cookieOptions);
   
   // Log cookie settings in development for debugging
-  if (!isProduction) {
-    console.log('Cookie set with options:', {
-      secure: cookieOptions.secure,
-      sameSite: cookieOptions.sameSite,
-      path: cookieOptions.path,
-      domain: cookieOptions.domain || 'not set',
-    });
-  }
+  // if (!isProduction) {
+  //   console.log('Cookie set with options:', {
+  //     secure: cookieOptions.secure,
+  //     sameSite: cookieOptions.sameSite,
+  //     path: cookieOptions.path,
+  //     domain: cookieOptions.domain || 'not set',
+  //   });
+  // }
 };
 
 module.exports = { generateToken, setTokenCookie };

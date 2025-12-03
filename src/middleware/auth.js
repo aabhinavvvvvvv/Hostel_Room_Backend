@@ -8,15 +8,15 @@ const authenticate = async (req, res, next) => {
     // Try to get token from cookie first, then from Authorization header
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
 
-    // Debug logging in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Auth check:', {
-        hasCookie: !!req.cookies?.token,
-        hasAuthHeader: !!req.headers.authorization,
-        cookies: Object.keys(req.cookies || {}),
-        origin: req.headers.origin,
-      });
-    }
+    // Debug logging (always log in production too for troubleshooting)
+    // console.log('Auth check:', {
+    //   hasCookie: !!req.cookies?.token,
+    //   hasAuthHeader: !!req.headers.authorization,
+    //   cookies: Object.keys(req.cookies || {}),
+    //   origin: req.headers.origin,
+    //   cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 50) + '...' : 'none',
+    //   path: req.path,
+    // });
 
     if (!token) {
       // More detailed error message for debugging
