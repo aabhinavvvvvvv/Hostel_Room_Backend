@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  WARDEN
+  ADMIN
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+enum ApplicationStatus {
+  PENDING
+  IN_PROGRESS
+  ALLOCATED
+  REJECTED
+  WAITLISTED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ALLOCATE
+  DEALLOCATE
+  APPROVE
+  REJECT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(STUDENT)
+  universityId String?  @map("university_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  applications Application[]
+  allocations  Allocation[]
+  auditLogs    AuditLog[] @relation("ActorAuditLogs")
+  assignedBeds Bed[]
+
+  @@map("users")
+}
+
+model Hostel {
+  id     String  @id @default(uuid())
+  name   String
+  gender String // MALE, FEMALE, MIXED
+  blocks Block[]
+
+  @@map("hostels")
+}
+
+model Block {
+  id       String  @id @default(uuid())
+  hostelId String  @map("hostel_id")
+  name     String
+  hostel   Hostel  @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  floors   Floor[]
+  rooms    Room[]
+
+  @@map("blocks")
+}
+
+model Floor {
+  id         String  @id @default(uuid())
+  blockId    String  @map("block_id")
+  floorNumber Int    @map("floor_number")
+  block      Block   @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  rooms      Room[]
+
+  @@unique([blockId, floorNumber])
+  @@map("floors")
+}
+
+model Room {
+  id       String     @id @default(uuid())
+  blockId  String     @map("block_id")
+  floorId  String     @map("floor_id")
+  number   String
+  capacity Int
+  features Json       // {ac: boolean, attachedBathroom: boolean, etc}
+  status   RoomStatus @default(AVAILABLE)
+  block    Block      @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  floor    Floor      @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  beds     Bed[]
+  allocations Allocation[]
+
+  @@unique([blockId, floorId, number])
+  @@map("rooms")
+}
+
+model Bed {
+  id          String   @id @default(uuid())
+  roomId      String   @map("room_id")
+  bedNumber   Int      @map("bed_number")
+  occupiedBy  String?  @map("occupied_by")
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  occupant    User?    @relation(fields: [occupiedBy], references: [id], onDelete: SetNull)
+  allocations Allocation[]
+
+  @@unique([roomId, bedNumber])
+  @@map("beds")
+}
+
+model Application {
+  id              String            @id @default(uuid())
+  studentId       String            @map("student_id")
+  preferences     Json              // {preferredHostels: [], roomType: string, roommatePreferences: {}}
+  status          ApplicationStatus @default(PENDING)
+  appliedAt       DateTime          @default(now()) @map("applied_at")
+  priorityCategory String?          @map("priority_category") // HANDICAPPED, MERIT, etc.
+  student         User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  allocations     Allocation[]
+  waitlistEntry   WaitlistEntry?
+
+  @@map("applications")
+}
+
+model Allocation {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  studentId     String   @map("student_id")
+  roomId        String   @map("room_id")
+  bedId         String   @map("bed_id")
+  allocatedAt   DateTime @default(now()) @map("allocated_at")
+  allocatedBy   String   @map("allocated_by") // User ID (admin/warden)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  student       User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  room          Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  bed           Bed        @relation(fields: [bedId], references: [id], onDelete: Cascade)
+
+  @@map("allocations")
+}
+
+model WaitlistEntry {
+  id            String     @id @default(uuid())
+  applicationId String     @unique @map("application_id")
+  rank          Int
+  hostelId      String?    @map("hostel_id")
+  roomType      String?    @map("room_type")
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("waitlist_entries")
+}
+
+model AuditLog {
+  id         String     @id @default(uuid())
+  actorId    String     @map("actor_id")
+  action     AuditAction
+  targetType String     @map("target_type") // USER, ROOM, APPLICATION, ALLOCATION, etc.
+  targetId   String     @map("target_id")
+  timestamp  DateTime   @default(now())
+  details    Json?      // Additional context
+  actor      User       @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
