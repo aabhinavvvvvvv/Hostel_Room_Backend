@@ -201,7 +201,22 @@ router.get('/me', authenticate, async (req, res) => {
  *         description: Logout successful
  */
 router.post('/logout', authenticate, (req, res) => {
-  res.clearCookie('token');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isCrossOrigin = process.env.FRONTEND_URL && 
+    !process.env.FRONTEND_URL.includes('localhost');
+  
+  const clearCookieOptions = {
+    httpOnly: true,
+    secure: isProduction || isCrossOrigin,
+    sameSite: (isProduction && isCrossOrigin) ? 'none' : 'lax',
+    path: '/',
+  };
+  
+  if (process.env.COOKIE_DOMAIN) {
+    clearCookieOptions.domain = process.env.COOKIE_DOMAIN;
+  }
+  
+  res.clearCookie('token', clearCookieOptions);
   res.json({ success: true, message: 'Logout successful' });
 });
 
